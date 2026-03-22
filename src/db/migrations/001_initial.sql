@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE pipelines (
+CREATE TABLE IF NOT EXISTS pipelines (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   source_token TEXT NOT NULL UNIQUE,
@@ -11,14 +11,14 @@ CREATE TABLE pipelines (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE subscribers (
+CREATE TABLE IF NOT EXISTS subscribers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   pipeline_id UUID NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
   payload JSONB NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE jobs (
   processed_at TIMESTAMPTZ
 );
 
-CREATE TABLE delivery_attempts (
+CREATE TABLE IF NOT EXISTS delivery_attempts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   subscriber_id UUID NOT NULL REFERENCES subscribers(id) ON DELETE CASCADE,
