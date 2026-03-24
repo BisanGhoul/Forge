@@ -4,6 +4,7 @@ import { pool } from './db/pool'
 import { runMigrations } from './db/migrate'
 import pipelineRoutes from './api/routes/pipelines'
 import webhookRoutes from './api/routes/webhooks'
+import jobRoutes from './api/routes/jobs'
 import { errorHandler } from './api/middleware/errorHandler'
 import { startWorker } from './core/worker/worker'
 
@@ -12,6 +13,7 @@ app.use(express.json())
 
 app.use('/pipelines', pipelineRoutes)
 app.use('/webhooks', webhookRoutes)
+app.use('/jobs', jobRoutes)
 
 app.get('/health', async (_req, res) => {
   await pool.query('SELECT 1')
