@@ -492,5 +492,74 @@ Every push to `main`, `dev`, or any `feat/**` branch triggers the GitHub Actions
 5. Runs ESLint
 
 Pull requests to `main` or `dev` also trigger this pipeline. The goal is to catch type errors and lint issues before they reach the main branches.
+## Design Decisions
+
+### Why raw SQL instead of an ORM?
+ORMs solve a problem this project doesn't have. Every query here is
+straightforward enough that writing it in SQL is faster and more
+readable than learning a query builder API on top of it. The part of
+an ORM that actually matters — type-safe query results — is handled by
+Zod. `pg` returns untyped rows, Zod validates the shape, TypeScript
+knows the type. That covers the same ground.
+
+The one place an ORM would have earned its keep is relationship
+loading — something like Prisma's `include: { subscribers: true }`
+would fetch a pipeline and its subscribers in a single query. With raw
+SQL it's easy to reach for two separate queries instead, and the
+code still works correctly either way.
+
+### Why polling instead of a push-based queue?
+`setInterval` polling every 5 seconds requires no additional
+infrastructure and is simple to reason about. The tradeoff is latency:
+a job can wait up to 5 seconds before the worker picks it up. In
+practice this doesn't matter here because the bottleneck is the OpenAI
+API call, not queue pickup time. I wanted to use pg.notify tho but forgot about it
+
+### Why worker and API in the same process?
+One less moving part. `startWorker()` is a single call in `index.ts`
+alongside `app.listen()`. The `processing` status in the jobs table
+acts as a soft lock — once a job is claimed, a second worker won't
+pick it up again. In production you'd split these into separate
+services so they can be scaled and deployed independently. Here, the
+simplicity is worth the constraint.
+
+### Why Zod?
+Two different jobs, same tool.
+
+For **request validation**, Zod gives structured, typed errors that map
+cleanly to a useful `400` response without manual if-checks scattered
+across route handlers.
+
+For **OpenAI response validation**, it's a defence against an external
+dependency with no fixed contract. The model is prompted to return
+structured JSON, but it can return markdown fences, unexpected keys, or
+malformed output. Each action validates the response shape with Zod
+before saving it — if validation fails, the job is marked `failed` with
+the raw response attached, which makes debugging straightforward.
+
+### Why gpt-4o-mini?
+It's fast and cheap for text tasks. The prompts for all three actions
+are simple enough that a smaller model handles them reliably. Since
+every response goes through Zod validation anyway, any unexpected
+output is caught and surfaced as a clear error rather than silently
+saved as a result.
+
+### Why is signature verification opt-in?
+Requiring a signature for every request would mean every new
+integration has to compute an HMAC before it can send its first
+webhook, which makes getting started unnecessarily painful. The current
+behaviour — accept if the header is absent, reject if it's present and
+wrong — matches how GitHub and Stripe handle it. The signature is a
+security feature you configure when you need it, not a mandatory gate.
+
+### Why Promise.allSettled for delivery?
+If one subscriber URL is down, the others should still receive the
+result. `Promise.all` throws on the first rejection and leaves
+remaining deliveries unstarted. `Promise.allSettled` runs all
+deliveries in parallel and collects every outcome before returning —
+each one recorded individually in `delivery_attempts`. One subscriber
+failing has no effect on any other.
 
 ---
+
+
