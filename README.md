@@ -41,8 +41,7 @@ The service never processes webhooks synchronously. Every incoming webhook is im
 ## Architecture
 
 ```
-<img width="1536" height="1024" alt="architecture" src="https://github.com/user-attachments/assets/66533852-5e1a-47ba-8ebf-9b655ff259a4" />
-
+![Architecture](architecture.png)
 ```
 
 The worker polls the DB every 5 seconds using `setInterval`.
